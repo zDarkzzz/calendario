@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f5d50">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Calendário">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Calendário com Etiquetas</title>
+<style>
+  :root{
+    --bg:#f4f1ec; --card:#ffffff; --ink:#1f2328; --muted:#6b7078; --line:#e3ded6;
+    --accent:#2f5d50;
+    --c1:#8fd19e; --c2:#8ec5ff; --c3:#ffe27a; --c4:#ffb877; --c5:#ff9a9a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);
+       padding:16px 12px 40px;max-width:980px;margin:0 auto}
+  h1{font-size:1.25rem;font-weight:700;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:.85rem;margin-top:2px}
+
+  /* Navegação do mês */
+  .nav{display:flex;align-items:center;justify-content:space-between;margin:14px 0 12px}
+  .nav button{border:1px solid var(--line);background:var(--card);width:40px;height:40px;border-radius:10px;
+              font-size:1.1rem;cursor:pointer;color:var(--ink)}
+  .mes{font-size:1.1rem;font-weight:700;text-transform:capitalize}
+  .hoje-btn{width:auto!important;padding:0 12px;font-size:.8rem!important;font-weight:600}
+
+  /* Legenda editável */
+  .legenda{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;align-items:center}
+  .leg{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);
+       padding:6px 10px;border-radius:20px;font:inherit;font-size:.8rem;font-weight:600;color:var(--ink);cursor:pointer}
+  .dot{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+  .leg-edit{border:0;background:transparent;color:var(--accent);font:inherit;font-size:.8rem;font-weight:700;
+            cursor:pointer;padding:6px 4px;text-decoration:underline}
+
+  /* Grade do mês */
+  .grade{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .grade .cab{text-align:center;font-size:.7rem;font-weight:700;color:var(--muted);padding:4px 0;text-transform:uppercase}
+  .g-dia{background:var(--card);border:1px solid var(--line);border-radius:8px;min-height:92px;padding:5px 4px;
+         cursor:pointer;display:flex;flex-direction:column;gap:3px;overflow:hidden}
+  .g-dia.vazio{background:transparent;border:0;cursor:default}
+  .g-topo{display:flex;align-items:baseline;justify-content:space-between;gap:2px}
+  .g-sem{font-size:.6rem;font-weight:700;text-transform:uppercase;opacity:.65}
+  .g-num{font-size:1rem;font-weight:700}
+  .g-dia.hoje{outline:2px solid var(--accent);outline-offset:-2px}
+  .g-val{font-size:.66rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .g-dia .etq{font-size:.62rem;line-height:1.2;padding:3px 4px;border-radius:4px;background:rgba(255,255,255,.85);
+              color:var(--ink);font-weight:600;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
+              overflow:hidden;word-break:break-word;border-left:3px solid rgba(0,0,0,.35)}
+  .cor1{background:var(--c1)!important} .cor2{background:var(--c2)!important} .cor3{background:var(--c3)!important}
+  .cor4{background:var(--c4)!important} .cor5{background:var(--c5)!important}
+
+  /* Lista de anotações (letra grande) */
+  .anot{margin-top:16px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 12px 6px}
+  .anot h3{font-size:.95rem;margin-bottom:8px}
+  .an-item{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;margin-bottom:6px;background:#f7f5f1;cursor:pointer}
+  .an-data{width:44px;flex:none;text-align:center;line-height:1.1}
+  .an-data span{display:block;font-size:.68rem;font-weight:700;text-transform:uppercase;opacity:.7}
+  .an-data b{font-size:1.3rem}
+  .an-txt{flex:1;min-width:0;font-size:.98rem;font-weight:600;background:rgba(255,255,255,.9);padding:7px 10px;border-radius:8px;word-break:break-word}
+  .an-txt small{display:block;font-size:.75rem;font-weight:500;color:var(--muted);margin-top:2px}
+
+  .apagar-mes{display:block;width:100%;margin-top:16px;padding:11px;border-radius:10px;border:1px solid #e2b4b4;
+              background:#fff;color:#a12626;font:inherit;font-size:.85rem;font-weight:700;cursor:pointer}
+  .apagar-mes:disabled{opacity:.45;cursor:default}
+  .acoes .salvar.perigo{background:#a12626;border-color:#a12626}
+  .backup{display:flex;gap:8px;margin-top:20px}
+  .backup button{flex:1;padding:10px 6px;border-radius:10px;border:1px dashed #b9b3aa;background:transparent;
+                 font:inherit;font-size:.78rem;font-weight:600;color:var(--muted);cursor:pointer}
+  .credito{text-align:center;font-size:.68rem;color:#9a958d;margin-top:24px}
+
+  /* Resumo do mês */
+  .resumo{margin-top:16px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .resumo h3{font-size:.95rem;margin-bottom:8px}
+  .r-lin{display:flex;align-items:center;gap:8px;font-size:.85rem;padding:5px 0;border-bottom:1px solid #f0ece6}
+  .r-lin:last-of-type{border-bottom:0}
+  .r-nome{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .r-qtd{color:var(--muted);white-space:nowrap}
+  .r-sub{font-weight:700;white-space:nowrap;min-width:84px;text-align:right}
+  .r-total{display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:2px solid var(--ink);
+           font-weight:800;font-size:1rem}
+  .filtro{display:flex;gap:6px;margin:0 0 10px}
+  .filtro button{flex:1;padding:8px 4px;border-radius:9px;border:1px solid var(--line);background:#f7f5f1;font:inherit;
+                 font-size:.78rem;font-weight:700;cursor:pointer;color:var(--muted);display:flex;flex-direction:column;gap:1px;align-items:center}
+  .filtro button small{font-weight:500;font-size:.68rem}
+  .filtro button.sel{background:var(--accent);border-color:var(--accent);color:#fff}
+  .r-dica{color:var(--muted);font-size:.78rem;margin-top:8px}
+
+  /* Folhas (editor do dia e da legenda) */
+  .fundo{position:fixed;inset:0;background:rgba(20,20,20,.4);display:none;align-items:flex-end;justify-content:center;z-index:10}
+  .fundo.on{display:flex}
+  .folha{background:var(--card);width:100%;max-width:520px;border-radius:18px 18px 0 0;
+         padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:90vh;overflow:auto}
+  .folha h2{font-size:1.05rem}
+  #tit{text-transform:capitalize}
+  .folha label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin:14px 0 6px}
+  .cores{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .cbtn{display:flex;align-items:center;gap:8px;border:2px solid var(--line);background:#fff;border-radius:10px;
+        padding:8px;font:inherit;font-size:.78rem;font-weight:600;cursor:pointer;text-align:left;min-width:0;color:var(--ink)}
+  .cbtn span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cbtn.sel{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+  .cbtn .dot{width:18px;height:18px}
+  .dot.semcor{background:#fff;border:2px dashed #b9b3aa;box-shadow:none}
+  textarea,input[type=text]{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;font-size:16px}
+  textarea{resize:none;height:70px}
+  .leg-lin{display:flex;align-items:center;gap:10px;margin-top:10px}
+  .leg-lin .dot{width:26px;height:26px}
+  .leg-lin .vin{width:96px;flex:none;text-align:right}
+  .leg-cab{display:flex;gap:10px;font-size:.72rem;font-weight:700;color:var(--muted);margin-top:12px;padding-left:70px}
+  .leg-cab span:nth-child(2){flex:1}
+  .leg-cab span:nth-child(3){width:96px;text-align:right}
+  .leg-cab span:first-child{display:none}
+  .leg-v{font-weight:500;color:var(--muted);margin-left:2px}
+  .leg-v::before{content:"· "}
+  .g-din{font-size:.6rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85}
+  .cbtn small{display:block;font-weight:500;color:var(--muted);font-size:.7rem}
+  .leg-lin input[type=checkbox]{width:24px;height:24px;flex:none;accent-color:var(--accent);cursor:pointer}
+  .leg-lin.off .dot,.leg-lin.off input[type=text]{opacity:.4}
+  .acoes{display:flex;gap:8px;margin-top:16px}
+  .acoes button{flex:1;padding:12px;border-radius:10px;font:inherit;font-weight:700;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink)}
+  .acoes .salvar{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .acoes .limpar{color:#a12626}
+  .obs{font-size:.78rem;color:var(--muted);margin-top:8px;line-height:1.4}
+  .compart{margin-top:12px}
+  .compart p{font-size:.85rem;font-weight:700;margin-bottom:6px}
+  .compart-bt{display:flex;gap:8px}
+  .compart-bt button{flex:1;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card);
+                     font:inherit;font-weight:700;font-size:.9rem;cursor:pointer;color:var(--ink)}
+  .chk{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:.9rem;font-weight:600}
+  .chk input{width:22px;height:22px;accent-color:var(--accent)}
+  .quinz{display:flex;gap:8px}
+  .quinz button{flex:1;padding:10px 8px;border-radius:10px;border:2px solid var(--line);background:#fff;font:inherit;
+                font-weight:700;font-size:.85rem;cursor:pointer;color:var(--ink);display:flex;flex-direction:column;gap:2px}
+  .quinz button small{font-weight:500;font-size:.72rem;color:var(--muted)}
+  .quinz button.sel{border-color:var(--accent);background:#eef5f2}
+  .aviso{font-size:.8rem;color:#a12626;margin-top:8px;min-height:1em}
+
+  @media (max-width:520px){
+    .g-dia{min-height:76px;padding:4px 3px}
+    .g-num{font-size:.9rem}
+    .g-sem{display:none}
+    .g-val{font-size:.56rem}
+    .g-dia .etq{font-size:.6rem;-webkit-line-clamp:3;padding:2px 3px}
+  }
+</style>
+</head>
+<body>
+
+<h1>Calendário com Etiquetas</h1>
+<p class="sub">Toque em um dia para escolher a cor e escrever a descrição. Toque na legenda para mudar o nome e o valor de cada cor.</p>
+
+<div class="nav">
+  <button id="ant" aria-label="Mês anterior">‹</button>
+  <div class="mes" id="mes"></div>
+  <div style="display:flex;gap:6px">
+    <button id="hoje" class="hoje-btn">Hoje</button>
+    <button id="prox" aria-label="Próximo mês">›</button>
+  </div>
+</div>
+
+<div class="legenda" id="legenda"></div>
+<div id="area"></div>
+<div id="anotacoes"></div>
+<div id="resumo"></div>
+<button class="apagar-mes" id="bApagarMes"></button>
+<div class="fundo" id="fundoApagar">
+  <div class="folha">
+    <h2 id="apTit"></h2>
+    <p class="obs" id="apInfo"></p>
+    <div class="acoes">
+      <button id="apNao">Cancelar</button>
+      <button class="salvar perigo" id="apSim">Apagar tudo</button>
+    </div>
+  </div>
+</div>
+<div class="backup">
+  <button id="bkSalvar">💾 Salvar cópia dos dados</button>
+  <button id="bkRestaurar">📂 Restaurar cópia</button>
+  <input type="file" id="bkArquivo" accept=".json,application/json" hidden>
+</div>
+<div class="fundo" id="fundoBk">
+  <div class="folha">
+    <h2>Restaurar cópia?</h2>
+    <p class="obs" id="bkInfo"></p>
+    <div class="acoes">
+      <button id="bkNao">Cancelar</button>
+      <button class="salvar" id="bkSim">Restaurar</button>
+    </div>
+  </div>
+</div>
+<p class="credito">Criado por Danilo Victor Cerino dos Santos – 2026</p>
+
+<!-- Editor do dia -->
+<div class="fundo" id="fundoDia">
+  <div class="folha">
+    <h2 id="tit"></h2>
+    <label>Cor do dia</label>
+    <div class="cores" id="cores"></div>
+    <label for="txt">Descrição (etiqueta)</label>
+    <textarea id="txt" maxlength="80" placeholder="Ex.: Campanha de vacinação"></textarea>
+    <div class="acoes">
+      <button class="limpar" id="bLimpar">Limpar</button>
+      <button id="bCancelar">Cancelar</button>
+      <button class="salvar" id="bSalvar">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Editor da legenda -->
+<div class="fundo" id="fundoLeg">
+  <div class="folha">
+    <h2>Nome e valor de cada cor</h2>
+    <p class="obs">Marque as cores que você vai usar: as desmarcadas somem da legenda e da escolha de cor do dia.<br>Em cada cor, escreva um <b>nome</b> (ex.: Plantão, Folga) e o <b>valor do dia</b>. O valor entra na soma da quinzena e do mês.</p>
+    <div class="leg-cab"><span></span><span>Nome</span><span>Valor (R$)</span></div>
+    <div id="legCampos"></div>
+    <div class="acoes">
+      <button id="lCancelar">Cancelar</button>
+      <button class="salvar" id="lSalvar">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Compartilhar (Pix) -->
+<div class="fundo" id="fundoExp">
+  <div class="folha">
+    <h2 id="expTit">Compartilhar</h2>
+    <label>Período</label>
+    <div class="quinz" id="quinz">
+      <button data-q="1">Primeira quinzena<small id="q1txt"></small></button>
+      <button data-q="2">Segunda quinzena<small id="q2txt"></small></button>
+    </div>
+    <div id="pixCampos">
+      <label for="pixChave">Chave Pix</label>
+      <input type="text" id="pixChave" maxlength="80" placeholder="CPF, celular, e-mail ou chave aleatória">
+      <label for="pixNome">Nome de quem vai receber</label>
+      <input type="text" id="pixNome" maxlength="60" placeholder="Nome completo">
+      <label for="pixBanco">Banco</label>
+      <input type="text" id="pixBanco" maxlength="50" placeholder="Ex.: Caixa, Banco do Brasil, Nubank">
+    </div>
+    <div class="aviso" id="expAviso"></div>
+    <div class="acoes">
+      <button id="eCancelar">Cancelar</button>
+      <button class="salvar" id="eGerar">Gerar e compartilhar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CORES_VAR = ["", "var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)"];
+const LEG_PADRAO = ["Sem cor", "Verde", "Azul", "Amarelo", "Laranja", "Vermelho"];
+const SEM_CURTO = ["dom","seg","ter","qua","qui","sex","sáb"];
+const SEM_LONGO = ["domingo","segunda","terça","quarta","quinta","sexta","sábado"];
+const MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+const CHAVE = "calendario-etiquetas-v1";
+const CREDITO = "Criado por Danilo Victor Cerino dos Santos - 2026";
+const CHAVE_LEG = "calendario-legenda-v1";
+
+let dados = null, legenda = null;
+try { dados = JSON.parse(localStorage.getItem(CHAVE)); } catch(e){}
+try { legenda = JSON.parse(localStorage.getItem(CHAVE_LEG)); } catch(e){}
+if (!Array.isArray(legenda) || legenda.length !== 6) legenda = LEG_PADRAO.slice();
+const CHAVE_ATIV = "calendario-cores-ativas-v1";
+let ativas = null;
+try { ativas = JSON.parse(localStorage.getItem(CHAVE_ATIV)); } catch(e){}
+// Padrão: verde, amarelo e vermelho ligados
+if (!Array.isArray(ativas) || ativas.length !== 6) ativas = [true, true, false, true, false, true];
+function salvarAtiv(){ try { localStorage.setItem(CHAVE_ATIV, JSON.stringify(ativas)); } catch(e){} }
+
+const hoje = new Date();
+let ano = hoje.getFullYear(), mes = hoje.getMonth(), filtro = 0;
+const p2 = n => String(n).padStart(2,"0");
+const k = (a,m,d) => `${a}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+
+// Exemplos para mostrar como fica (só na primeira vez)
+if (!dados) {
+  dados = {};
+  const ex = [
+    [3,1,"Reunião de equipe"],[5,1,"Visitas micro-área 1"],[9,3,"Grupo de hipertensos"],
+    [12,1,"Reunião de equipe"],[14,5,"Campanha de vacinação"],[17,1,"Visitas micro-área 2"],
+    [20,3,"Folga"],[23,3,"Entrega de relatórios"],[26,1,"Visitas micro-área 3"],[28,5,"Mutirão de saúde"]
+  ];
+  const ult = new Date(ano, mes+1, 0).getDate();
+  ex.forEach(([d,c,t]) => { if (d<=ult) dados[k(ano,mes,d)] = {c,t}; });
+}
+function salvarDados(){ try { localStorage.setItem(CHAVE, JSON.stringify(dados)); } catch(e){} }
+const CHAVE_VAL = "calendario-valores-v1";
+let valores = null;
+try { valores = JSON.parse(localStorage.getItem(CHAVE_VAL)); } catch(e){}
+function salvarLeg(){ try { localStorage.setItem(CHAVE_LEG, JSON.stringify(legenda)); localStorage.setItem(CHAVE_VAL, JSON.stringify(valores)); } catch(e){} }
+
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
+function info(d){ return dados[k(ano,mes,d)] || {c:0,t:""}; }
+function ehHoje(d){ return ano===hoje.getFullYear() && mes===hoje.getMonth() && d===hoje.getDate(); }
+function nomeCor(c){ return (legenda[c] || "").trim(); }
+function valorCor(c){ return (valores && typeof valores[c] === "number") ? valores[c] : null; }
+// Texto principal da cor: nome; se não tiver nome, o valor; se não tiver nada, o nome da cor
+function rotulo(c){ return nomeCor(c) || (valorCor(c) !== null ? fmt(valorCor(c)) : LEG_PADRAO[c]); }
+
+// Lê o primeiro número do texto (aceita "R$ 1.250,50", "150", "12,5", "10.5")
+function lerValor(txt){
+  const m = String(txt).match(/R\$\s*(-?\d[\d.]*(,\d+)?)/i)?.slice(1) || String(txt).match(/-?\d[\d.]*(,\d+)?/);
+  if (!m) return null;
+  let s = m[0];
+  if (s.includes(",")) s = s.replace(/\./g,"").replace(",",".");
+  else if (/\.\d{3}(\.|$)/.test(s)) s = s.replace(/\./g,"");
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+function fmt(n){ return n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}); }
+
+// Migração: texto antigo tipo "Plantão R$ 80" vira nome "Plantão" + valor 80
+if (!Array.isArray(valores) || valores.length !== 6){
+  valores = [null,null,null,null,null,null];
+  for (let c=1;c<=5;c++){
+    const v = lerValor(legenda[c] || "");
+    if (v !== null){
+      valores[c] = v;
+      const txt = String(legenda[c]), comRS = /R\$\s*-?\d/i.test(txt);
+      legenda[c] = (comRS ? txt.replace(/R\$\s*-?\d[\d.]*(,\d+)?/i,"") : txt.replace(/-?\d[\d.]*(,\d+)?/,""))
+                     .replace(/\s{2,}/g," ").trim();
+    }
+  }
+  salvarLeg();
+}
+
+function desenhar(){
+  document.getElementById("mes").textContent = `${MESES[mes]} ${ano}`;
+  document.getElementById("legenda").innerHTML = [1,2,3,4,5].filter(c => ativas[c])
+    .map(c => `<button class="leg" data-leg="${c}"><i class="dot" style="background:${CORES_VAR[c]}"></i>${esc(rotulo(c))}${nomeCor(c) && valorCor(c)!==null ? `<span class="leg-v">${fmt(valorCor(c))}</span>` : ""}</button>`).join("")
+    + `<button class="leg-edit" data-leg="1">✎ Editar</button>`;
+
+  const ult = new Date(ano, mes+1, 0).getDate();
+  const ini = new Date(ano, mes, 1).getDay();
+  let h = `<div class="grade">` + SEM_CURTO.map(s=>`<div class="cab">${s}</div>`).join("");
+  for (let i=0;i<ini;i++) h += `<div class="g-dia vazio"></div>`;
+  const qtd = [0,0,0,0,0,0];
+  const fIni = filtro === 2 ? 16 : 1, fFim = filtro === 1 ? 15 : ult;
+  for (let d=1; d<=ult; d++){
+    const w = new Date(ano,mes,d).getDay(), x = info(d);
+    if (x.c && d >= fIni && d <= fFim) qtd[x.c]++;
+    h += `<div class="g-dia ${x.c?"cor"+x.c:""} ${ehHoje(d)?"hoje":""}" data-d="${d}">
+            <div class="g-topo"><span class="g-num">${d}</span><span class="g-sem">${SEM_CURTO[w]}</span></div>
+            ${x.c ? `<div class="g-val">${esc(rotulo(x.c))}</div>${nomeCor(x.c) && valorCor(x.c)!==null ? `<div class="g-din">${fmt(valorCor(x.c))}</div>` : ""}` : ""}
+            ${x.t ? `<span class="etq">${esc(x.t)}</span>` : ""}</div>`;
+  }
+  h += `</div>`;
+  document.getElementById("area").innerHTML = h;
+  const prefixo = `${ano}-${p2(mes+1)}-`;
+  const marcados = Object.keys(dados).filter(c => c.startsWith(prefixo)).length;
+  const bAp = document.getElementById("bApagarMes");
+  bAp.textContent = `🗑️ Apagar dados de ${MESES[mes]}`;
+  bAp.disabled = marcados === 0;
+
+  // Lista das anotações em letra grande (para ler melhor)
+  let an = "";
+  for (let d=1; d<=ult; d++){
+    const x = info(d); if (!x.t) continue;
+    const w = new Date(ano,mes,d).getDay();
+    an += `<div class="an-item ${x.c?"cor"+x.c:""}" data-d="${d}">
+             <div class="an-data"><span>${SEM_CURTO[w]}</span><b>${d}</b></div>
+             <div class="an-txt">${esc(x.t)}${x.c ? `<small>${esc(rotulo(x.c))}${nomeCor(x.c) && valorCor(x.c)!==null ? " · "+fmt(valorCor(x.c)) : ""}</small>` : ""}</div>
+           </div>`;
+  }
+  document.getElementById("anotacoes").innerHTML = an
+    ? `<div class="anot"><h3>Anotações de ${MESES[mes]}</h3>${an}</div>` : "";
+
+  // Resumo do mês
+  let linhas = "", total = 0, algumValor = false;
+  for (let c=1;c<=5;c++){
+    if (!qtd[c]) continue;
+    const v = valorCor(c);
+    let sub = "—";
+    if (v !== null){ algumValor = true; total += v*qtd[c]; sub = fmt(v*qtd[c]); }
+    linhas += `<div class="r-lin"><i class="dot" style="background:${CORES_VAR[c]}"></i>
+                 <span class="r-nome">${esc(rotulo(c))}</span>
+                 <span class="r-qtd">${qtd[c]} dia${qtd[c]>1?"s":""}${v!==null?` × ${fmt(v)}`:""}</span>
+                 <span class="r-sub">${sub}</span></div>`;
+  }
+  const rotFiltro = ["do mês","da 1ª quinzena","da 2ª quinzena"][filtro];
+  const m2 = p2(mes+1);
+  document.getElementById("resumo").innerHTML = `<div class="resumo"><h3>Resumo de ${MESES[mes]}</h3>
+    <div class="filtro">
+      <button data-f="0" class="${filtro===0?"sel":""}">Mês inteiro</button>
+      <button data-f="1" class="${filtro===1?"sel":""}">1ª quinzena<small>01 a 15/${m2}</small></button>
+      <button data-f="2" class="${filtro===2?"sel":""}">2ª quinzena<small>16 a ${ult}/${m2}</small></button>
+    </div>
+    ${linhas || `<p class="r-dica">Nenhum dia pintado neste período.</p>`}
+    ${linhas ? (algumValor ? `<div class="r-total"><span>Total ${rotFiltro}</span><span>${fmt(total)}</span></div>`
+                 : `<p class="r-dica">Coloque o valor de cada cor (toque em “Editar”) para ver a soma.</p>`) : ""}</div>`;
+  document.getElementById("resumo").innerHTML += `<div class="compart">
+      <p>Enviar quinzena de ${MESES[mes]}</p>
+      <div class="compart-bt"><button data-exp="pdf">📄 PDF</button><button data-exp="xlsx">📊 Excel</button></div></div>`;
+}
+
+// ===== Editor do dia =====
+let diaSel = null, corSel = 0;
+const fundoDia = document.getElementById("fundoDia");
+function abrirDia(d){
+  diaSel = d; const x = info(d); corSel = x.c;
+  const w = new Date(ano,mes,d).getDay();
+  document.getElementById("tit").textContent = `${SEM_LONGO[w]}, ${d} de ${MESES[mes]}`;
+  document.getElementById("txt").value = x.t;
+  pintarCores(); fundoDia.classList.add("on");
+}
+function pintarCores(){
+  document.getElementById("cores").innerHTML = [1,2,3,4,5,0].filter(c => c===0 || ativas[c] || c===corSel).map(c =>
+    `<button class="cbtn ${c===corSel?"sel":""}" data-c="${c}">
+       <i class="dot ${c===0?"semcor":""}" style="${c?`background:${CORES_VAR[c]}`:""}"></i>
+       <span>${esc(c===0?"Sem cor":rotulo(c))}${c && nomeCor(c) && valorCor(c)!==null ? `<small>${fmt(valorCor(c))}</small>` : ""}</span></button>`).join("");
+}
+document.getElementById("cores").addEventListener("click", e => {
+  const b = e.target.closest(".cbtn"); if (!b) return;
+  corSel = +b.dataset.c; pintarCores();
+});
+document.getElementById("bSalvar").onclick = () => {
+  const t = document.getElementById("txt").value.trim();
+  const chave = k(ano,mes,diaSel);
+  if (!t && !corSel) delete dados[chave]; else dados[chave] = {c:corSel, t};
+  salvarDados(); fundoDia.classList.remove("on"); desenhar();
+};
+document.getElementById("bLimpar").onclick = () => { delete dados[k(ano,mes,diaSel)]; salvarDados(); fundoDia.classList.remove("on"); desenhar(); };
+document.getElementById("bCancelar").onclick = () => fundoDia.classList.remove("on");
+
+// ===== Editor da legenda =====
+const fundoLeg = document.getElementById("fundoLeg");
+function abrirLeg(foco){
+  document.getElementById("legCampos").innerHTML = [1,2,3,4,5].map(c =>
+    `<div class="leg-lin ${ativas[c]?"":"off"}">
+       <input type="checkbox" id="atv${c}" ${ativas[c]?"checked":""} aria-label="Usar ${LEG_PADRAO[c]}">
+       <i class="dot" style="background:${CORES_VAR[c]}"></i>
+       <input type="text" maxlength="40" id="leg${c}" value="${esc(nomeCor(c))}" placeholder="Nome">
+       <input type="text" class="vin" inputmode="decimal" maxlength="14" id="val${c}" value="${valorCor(c)!==null ? valorCor(c).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}) : ""}" placeholder="0,00"></div>`).join("");
+  document.querySelectorAll("#legCampos input[type=checkbox]").forEach(cb =>
+    cb.onchange = () => cb.parentElement.classList.toggle("off", !cb.checked));
+  fundoLeg.classList.add("on");
+  setTimeout(() => { const el = document.getElementById("leg"+foco); if (el) el.focus(); }, 50);
+}
+document.getElementById("lSalvar").onclick = () => {
+  for (let c=1;c<=5;c++){
+    legenda[c] = document.getElementById("leg"+c).value.trim();
+    valores[c] = lerValor(document.getElementById("val"+c).value);
+    ativas[c] = document.getElementById("atv"+c).checked;
+  }
+  salvarLeg(); salvarAtiv(); fundoLeg.classList.remove("on"); desenhar();
+};
+document.getElementById("lCancelar").onclick = () => fundoLeg.classList.remove("on");
+
+[fundoDia, fundoLeg].forEach(f => f.addEventListener("click", e => { if (e.target === f) f.classList.remove("on"); }));
+document.getElementById("legenda").addEventListener("click", e => {
+  const b = e.target.closest("[data-leg]"); if (b) abrirLeg(+b.dataset.leg);
+});
+document.getElementById("anotacoes").addEventListener("click", e => {
+  const el = e.target.closest("[data-d]"); if (el) abrirDia(+el.dataset.d);
+});
+document.getElementById("area").addEventListener("click", e => {
+  const el = e.target.closest("[data-d]"); if (el) abrirDia(+el.dataset.d);
+});
+document.getElementById("ant").onclick = () => { mes--; if (mes<0){mes=11;ano--;} desenhar(); };
+document.getElementById("prox").onclick = () => { mes++; if (mes>11){mes=0;ano++;} desenhar(); };
+document.getElementById("hoje").onclick = () => { ano=hoje.getFullYear(); mes=hoje.getMonth(); desenhar(); };
+
+// ===================== Exportação =====================
+const HEX = ["", "8fd19e", "8ec5ff", "ffe27a", "ffb877", "ff9a9a"];
+const NOME_COR = ["", "Verde", "Azul", "Amarelo", "Laranja", "Vermelho"];
+
+function dadosDaQuinzena(q){
+  const ultMes = new Date(ano, mes+1, 0).getDate();
+  const ini = q === 1 ? 1 : 16, ult = q === 1 ? 15 : ultMes;
+  const qtd = [0,0,0,0,0,0], dias = [];
+  for (let d=ini; d<=ult; d++){
+    const x = info(d);
+    if (!x.c && !x.t) continue;
+    if (x.c) qtd[x.c]++;
+    dias.push({ data:`${p2(d)}/${p2(mes+1)}/${ano}`, sem:SEM_LONGO[new Date(ano,mes,d).getDay()],
+                c:x.c, leg:x.c?rotulo(x.c):"", valor:x.c?valorCor(x.c):null, desc:x.t });
+  }
+  const resumo = []; let total = 0;
+  for (let c=1;c<=5;c++){
+    if (!qtd[c]) continue;
+    const v = valorCor(c), sub = v===null ? null : v*qtd[c];
+    if (sub !== null) total += sub;
+    resumo.push({ c, leg:rotulo(c), dias:qtd[c], unit:v, sub });
+  }
+  const mesNome = MESES[mes][0].toUpperCase() + MESES[mes].slice(1);
+  return { titulo:`${q===1?"Primeira":"Segunda"} Quinzena - ${mesNome}`,
+           periodo:`Período: ${p2(ini)}/${p2(mes+1)}/${ano} a ${p2(ult)}/${p2(mes+1)}/${ano}`,
+           mesNome, resumo, total, dias };
+}
+
+// ---------- PDF (feito à mão, A4) ----------
+function pdfTexto(s){
+  const mapa = {"“":'"',"”":'"',"‘":"'","’":"'","–":"-","—":"-","…":"...","•":"-"};
+  return String(s).replace(/[^\x00-\xff]/g, ch => mapa[ch] || "?")
+                  .replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)");
+}
+const cortar = (s,n) => { s = String(s||""); return s.length>n ? s.slice(0,n-1)+"…" : s; };
+const rgb = hex => [0,2,4].map(i => (parseInt(hex.substr(i,2),16)/255).toFixed(3)).join(" ");
+
+function gerarPDF(D, pix){
+  const W=595, H=842, M=40, paginas=[]; let ops=[], y=M;
+  const T = (x,yy,s,sz=10,b=false,cor="0 0 0") =>
+    ops.push(`${cor} rg BT /${b?"F2":"F1"} ${sz} Tf ${x.toFixed(1)} ${(H-yy).toFixed(1)} Td (${pdfTexto(s)}) Tj ET`);
+  const TD = (xd,yy,s,sz=10,b=false) => T(xd - String(s).length*sz*0.53, yy, s, sz, b); // alinhado à direita
+  const R = (x,yy,w,h,hex) => ops.push(`${rgb(hex)} rg ${x} ${(H-yy-h).toFixed(1)} ${w} ${h} re f`);
+  const B = (x,yy,w,h) => ops.push(`0.6 0.6 0.6 RG 0.8 w ${x} ${(H-yy-h).toFixed(1)} ${w} ${h} re S`);
+  const L = (yy) => ops.push(`0.85 0.85 0.85 RG 0.5 w ${M} ${(H-yy).toFixed(1)} m ${W-M} ${(H-yy).toFixed(1)} l S`);
+  const precisa = h => { if (y+h > H-M){ paginas.push(ops); ops=[]; y=M; } };
+  const hoje2 = new Date();
+
+  T(M, y+18, D.titulo, 18, true); y += 30;
+  T(M, y+10, D.periodo, 10, false, "0.25 0.25 0.25"); y += 16;
+  T(M, y+9, `Gerado em ${p2(hoje2.getDate())}/${p2(hoje2.getMonth()+1)}/${hoje2.getFullYear()}`, 9, false, "0.45 0.45 0.45"); y += 26;
+
+  // Resumo
+  T(M, y+11, "Resumo da quinzena", 12, true); y += 20;
+  R(M, y, W-2*M, 18, "eeeeee");
+  T(M+6, y+12, "Legenda", 9, true); T(M+270, y+12, "Dias", 9, true);
+  TD(M+420, y+12, "Valor unit.", 9, true); TD(W-M-6, y+12, "Subtotal", 9, true); y += 18;
+  if (!D.resumo.length){ T(M+6, y+13, "Nenhum dia pintado nesta quinzena.", 9); y += 20; }
+  D.resumo.forEach(r => {
+    precisa(20);
+    R(M+6, y+5, 10, 10, HEX[r.c]); B(M+6, y+5, 10, 10);
+    T(M+22, y+13, cortar(r.leg,40), 9); T(M+270, y+13, String(r.dias), 9);
+    TD(M+420, y+13, r.unit===null?"-":fmt(r.unit), 9); TD(W-M-6, y+13, r.sub===null?"-":fmt(r.sub), 9);
+    y += 20; L(y);
+  });
+  precisa(26);
+  T(M+6, y+17, "Total da quinzena", 11, true); TD(W-M-6, y+17, fmt(D.total), 11, true); y += 34;
+
+  // Dias
+  precisa(60);
+  T(M, y+11, "Dias da quinzena", 12, true); y += 20;
+  const cab = () => {
+    R(M, y, W-2*M, 18, "eeeeee");
+    T(M+6, y+12, "Data", 9, true); T(M+66, y+12, "Dia", 9, true); T(M+120, y+12, "Legenda", 9, true);
+    TD(M+300, y+12, "Valor", 9, true); T(M+310, y+12, "Descrição", 9, true); y += 18;
+  };
+  cab();
+  if (!D.dias.length){ T(M+6, y+13, "Nenhum dia marcado nesta quinzena.", 9); y += 20; }
+  D.dias.forEach(d => {
+    if (y+18 > H-M){ paginas.push(ops); ops=[]; y=M; cab(); }
+    T(M+6, y+12, d.data, 9); T(M+66, y+12, d.sem, 9);
+    if (d.c){ R(M+120, y+4, 9, 9, HEX[d.c]); B(M+120, y+4, 9, 9); T(M+134, y+12, cortar(d.leg,17), 9); }
+    TD(M+300, y+12, d.valor===null ? "" : fmt(d.valor), 9);
+    T(M+310, y+12, cortar(d.desc,42), 9);
+    y += 18; L(y);
+  });
+
+  // Pix
+  if (pix){
+    y += 16; precisa(86);
+    B(M, y, W-2*M, 78);
+    T(M+12, y+18, "Pagamento via Pix", 11, true);
+    T(M+12, y+36, "Chave Pix: ", 10, true);  T(M+80, y+36, cortar(pix.chave,70), 10);
+    T(M+12, y+52, "Favorecido: ", 10, true); T(M+80, y+52, cortar(pix.nome,70), 10);
+    T(M+12, y+68, "Banco: ", 10, true);      T(M+80, y+68, cortar(pix.banco,70), 10);
+    y += 78;
+  }
+  paginas.push(ops);
+
+  // Montagem do arquivo
+  const objs = [];
+  objs[1] = "<< /Type /Catalog /Pages 2 0 R >>";
+  objs[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
+  objs[4] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>";
+  const kids = [];
+  paginas.forEach((p,i) => {
+    p.push(`0.55 0.55 0.55 rg BT /F1 7 Tf ${M} 24 Td (${pdfTexto(CREDITO)}) Tj ET`);
+    const pg = 5 + i*2, ct = pg + 1, conteudo = p.join("\n");
+    kids.push(`${pg} 0 R`);
+    objs[pg] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${ct} 0 R >>`;
+    objs[ct] = `<< /Length ${conteudo.length} >>\nstream\n${conteudo}\nendstream`;
+  });
+  objs[2] = `<< /Type /Pages /Kids [${kids.join(" ")}] /Count ${kids.length} >>`;
+  let out = "%PDF-1.4\n%\xe2\xe3\xcf\xd3\n"; const offs = [];
+  for (let i=1;i<objs.length;i++){ offs[i] = out.length; out += `${i} 0 obj\n${objs[i]}\nendobj\n`; }
+  const xref = out.length;
+  out += `xref\n0 ${objs.length}\n0000000000 65535 f \n` +
+         offs.slice(1).map(o => String(o).padStart(10,"0") + " 00000 n \n").join("") +
+         `trailer\n<< /Size ${objs.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  const bytes = new Uint8Array(out.length);
+  for (let i=0;i<out.length;i++) bytes[i] = out.charCodeAt(i) & 255;
+  return new Blob([bytes], {type:"application/pdf"});
+}
+
+// ---------- Excel (.xlsx feito à mão) ----------
+const xEsc = s => String(s).replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
+const CRC = (() => { const t=[]; for (let n=0;n<256;n++){ let c=n; for (let k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1; t[n]=c>>>0; } return t; })();
+function crc32(b){ let c=0xFFFFFFFF; for (let i=0;i<b.length;i++) c = CRC[(c^b[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function zip(arquivos){
+  const enc = new TextEncoder(), partes = [], central = []; let pos = 0;
+  const u16 = n => [n&255,(n>>>8)&255], u32 = n => [n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255];
+  arquivos.forEach(([nome, txt]) => {
+    const nb = enc.encode(nome), db = enc.encode(txt), crc = crc32(db);
+    const comum = [...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(db.length), ...u32(db.length), ...u16(nb.length), ...u16(0)];
+    const local = new Uint8Array([...u32(0x04034b50), ...comum]);
+    partes.push(local, nb, db);
+    central.push(new Uint8Array([...u32(0x02014b50), ...u16(20), ...comum, ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(pos)]), nb);
+    pos += local.length + nb.length + db.length;
+  });
+  const tamC = central.reduce((s,a) => s+a.length, 0);
+  const fim = new Uint8Array([...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(arquivos.length), ...u16(arquivos.length), ...u32(tamC), ...u32(pos), ...u16(0)]);
+  return new Blob([...partes, ...central, fim], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+
+function gerarXLSX(D, pix){
+  // estilos: 0 normal | 1 negrito | 2 moeda | 3 negrito+moeda | 4 título | 5..9 fundo das cores | 10 cabeçalho
+  const linhas = []; let r = 0;
+  const col = i => "ABCDEF"[i];
+  const lin = (cels) => { r++; linhas.push(`<row r="${r}">` + cels.map((c,i) => {
+      if (c === null || c === undefined || c === "") return "";
+      const [v, s] = Array.isArray(c) ? c : [c, 0];
+      if (v === null || v === "") return s ? `<c r="${col(i)}${r}" s="${s}"/>` : "";
+      return typeof v === "number"
+        ? `<c r="${col(i)}${r}" s="${s}"><v>${v}</v></c>`
+        : `<c r="${col(i)}${r}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${xEsc(v)}</t></is></c>`;
+    }).join("") + `</row>`); };
+  const vazia = () => { r++; };
+
+  lin([[D.titulo,4]]); lin([D.periodo]); vazia();
+  lin([["Resumo da quinzena",1]]);
+  lin([["Legenda",10],["Dias",10],["Valor unitário",10],["Subtotal",10]]);
+  D.resumo.forEach(x => lin([[x.leg,4+x.c], x.dias, [x.unit,2], [x.sub,2]]));
+  lin([["Total da quinzena",1],"","",[D.total,3]]);
+  vazia();
+  lin([["Dias da quinzena",1]]);
+  lin([["Data",10],["Dia da semana",10],["Legenda",10],["Valor",10],["Descrição",10]]);
+  D.dias.forEach(d => lin([d.data, d.sem, d.c?[d.leg,4+d.c]:"", [d.valor,2], d.desc]));
+  if (pix){ vazia(); lin([["Pagamento via Pix",1]]); lin([["Chave Pix",1], pix.chave]); lin([["Favorecido",1], pix.nome]); lin([["Banco",1], pix.banco]); }
+
+  vazia(); lin([CREDITO]);
+  const larg = [22,16,22,16,44];
+  const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>${larg.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("")}</cols><sheetData>${linhas.join("")}</sheetData></worksheet>`;
+  const fills = HEX.slice(1).map(h => `<fill><patternFill patternType="solid"><fgColor rgb="FF${h.toUpperCase()}"/><bgColor indexed="64"/></patternFill></fill>`).join("");
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;R$&quot;\\ #,##0.00"/></numFmts>
+<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font></fonts>
+<fills count="8"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fills}<fill><patternFill patternType="solid"><fgColor rgb="FFEEEEEE"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="11">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+${[2,3,4,5,6].map(f=>`<xf numFmtId="0" fontId="0" fillId="${f}" borderId="0" xfId="0" applyFill="1"/>`).join("\n")}
+<xf numFmtId="0" fontId="1" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
+</cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+  const aba = D.titulo.slice(0,31);
+  return zip([
+    ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`],
+    ["_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ["xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xEsc(aba)}" sheetId="1" r:id="rId1"/></sheets></workbook>`],
+    ["xl/_rels/workbook.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ["xl/worksheets/sheet1.xml", sheet],
+    ["xl/styles.xml", styles]
+  ]);
+}
+
+// ---------- Compartilhar ----------
+let downloadsNS;
+const pegarDownloads = () => {
+  if (downloadsNS === undefined)
+    downloadsNS = (window.claude && window.claude.use) ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null);
+  return downloadsNS;
+};
+function mostrarAviso(msg){
+  const el = document.createElement("div");
+  el.textContent = msg;
+  el.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1f2328;color:#fff;padding:10px 16px;border-radius:10px;font-size:.85rem;z-index:20;max-width:90%;text-align:center";
+  document.body.appendChild(el); setTimeout(() => el.remove(), 3500);
+}
+async function compartilhar(blob, nome){
+  // 1) Dentro do app Claude: salvar/compartilhar pelo próprio app (no iPhone abre a tela de compartilhar)
+  const dl = await pegarDownloads();
+  if (dl){
+    try { await dl.save({filename: nome, data: blob}); return; }
+    catch(e){
+      if (e && e.code === "declined") return;
+      if (e && e.code === "rate_limited"){ mostrarAviso("Aguarde um instante e tente de novo."); return; }
+    }
+  }
+  // 2) Fora do app: compartilhamento do celular ou download comum
+  const arquivo = new File([blob], nome, {type: blob.type});
+  try {
+    if (navigator.canShare && navigator.canShare({files:[arquivo]})){
+      await navigator.share({files:[arquivo], title:nome});
+      return;
+    }
+  } catch(e){ if (e && e.name === "AbortError") return; }
+  const url = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+const CHAVE_PIX = "calendario-pix-v1";
+let pixSalvo = {chave:"", nome:"", banco:""};
+try { pixSalvo = Object.assign(pixSalvo, JSON.parse(localStorage.getItem(CHAVE_PIX)) || {}); } catch(e){}
+let tipoExp = "pdf", quinzSel = 1;
+const fundoExp = document.getElementById("fundoExp");
+function pintarQuinz(){
+  document.querySelectorAll("#quinz button").forEach(b => b.classList.toggle("sel", +b.dataset.q === quinzSel));
+}
+document.getElementById("quinz").addEventListener("click", e => {
+  const b = e.target.closest("[data-q]"); if (!b) return;
+  quinzSel = +b.dataset.q; pintarQuinz();
+});
+
+document.getElementById("resumo").addEventListener("click", e => {
+  const f = e.target.closest("[data-f]"); if (f){ filtro = +f.dataset.f; desenhar(); return; }
+  const b = e.target.closest("[data-exp]"); if (!b) return;
+  tipoExp = b.dataset.exp;
+  document.getElementById("expTit").textContent = tipoExp === "pdf" ? "Compartilhar em PDF" : "Compartilhar em Excel";
+  const ultMes = new Date(ano, mes+1, 0).getDate(), m2 = p2(mes+1);
+  document.getElementById("q1txt").textContent = `01/${m2} a 15/${m2}`;
+  document.getElementById("q2txt").textContent = `16/${m2} a ${ultMes}/${m2}`;
+  // Sugere a quinzena: no mês atual, a que já passou/está em andamento
+  quinzSel = (ano === hoje.getFullYear() && mes === hoje.getMonth() && hoje.getDate() <= 15) ? 1
+           : (ano === hoje.getFullYear() && mes === hoje.getMonth()) ? 2 : 1;
+  if (filtro) quinzSel = filtro;
+  pintarQuinz();
+  document.getElementById("pixChave").value = pixSalvo.chave;
+  document.getElementById("pixNome").value = pixSalvo.nome;
+  document.getElementById("pixBanco").value = pixSalvo.banco;
+  document.getElementById("expAviso").textContent = "";
+  fundoExp.classList.add("on");
+});
+document.getElementById("eCancelar").onclick = () => fundoExp.classList.remove("on");
+fundoExp.addEventListener("click", e => { if (e.target === fundoExp) fundoExp.classList.remove("on"); });
+document.getElementById("eGerar").onclick = async () => {
+  const chave = document.getElementById("pixChave").value.trim();
+  const nome = document.getElementById("pixNome").value.trim();
+  const banco = document.getElementById("pixBanco").value.trim();
+  const falta = [!chave && "chave Pix", !nome && "nome", !banco && "banco"].filter(Boolean);
+  if (falta.length){ document.getElementById("expAviso").textContent = "Preencha: " + falta.join(", ") + "."; return; }
+  pixSalvo = {chave, nome, banco};
+  try { localStorage.setItem(CHAVE_PIX, JSON.stringify(pixSalvo)); } catch(e){}
+  const D = dadosDaQuinzena(quinzSel), pix = {chave, nome, banco};
+  const base = `${quinzSel===1?"primeira":"segunda"}-quinzena-${MESES[mes]}-${ano}`
+                 .normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  fundoExp.classList.remove("on");
+  if (tipoExp === "pdf") await compartilhar(gerarPDF(D, pix), base + ".pdf");
+  else await compartilhar(gerarXLSX(D, pix), base + ".xlsx");
+};
+
+// ---------- Apagar todos os dados do mês ----------
+const fundoApagar = document.getElementById("fundoApagar");
+document.getElementById("bApagarMes").onclick = () => {
+  const prefixo = `${ano}-${p2(mes+1)}-`;
+  const n = Object.keys(dados).filter(c => c.startsWith(prefixo)).length;
+  if (!n) return;
+  document.getElementById("apTit").textContent = `Apagar ${MESES[mes]} de ${ano}?`;
+  document.getElementById("apInfo").textContent =
+    `${n} dia${n>1?"s":""} com cor ou descrição ser${n>1?"ão":"á"} apagado${n>1?"s":""}. ` +
+    `Os nomes e valores das cores e os dados do Pix continuam salvos. Isso não pode ser desfeito — se quiser, use antes o botão “Salvar cópia dos dados”.`;
+  fundoApagar.classList.add("on");
+};
+document.getElementById("apNao").onclick = () => fundoApagar.classList.remove("on");
+fundoApagar.addEventListener("click", e => { if (e.target === fundoApagar) fundoApagar.classList.remove("on"); });
+document.getElementById("apSim").onclick = () => {
+  const prefixo = `${ano}-${p2(mes+1)}-`;
+  Object.keys(dados).forEach(c => { if (c.startsWith(prefixo)) delete dados[c]; });
+  salvarDados(); fundoApagar.classList.remove("on"); desenhar();
+  mostrarAviso(`Dados de ${MESES[mes]} apagados.`);
+};
+
+// ---------- Cópia de segurança (para trocar de celular ou de versão) ----------
+const CHAVES_BK = [CHAVE, CHAVE_LEG, CHAVE_VAL, CHAVE_ATIV, CHAVE_PIX];
+document.getElementById("bkSalvar").onclick = async () => {
+  const pacote = {app:"calendario-etiquetas", versao:1, criadoEm:new Date().toISOString(), dados:{}};
+  CHAVES_BK.forEach(c => { try { const v = localStorage.getItem(c); if (v !== null) pacote.dados[c] = v; } catch(e){} });
+  // garante o que está na memória mesmo se o navegador não salvou
+  pacote.dados[CHAVE] = JSON.stringify(dados); pacote.dados[CHAVE_LEG] = JSON.stringify(legenda);
+  pacote.dados[CHAVE_VAL] = JSON.stringify(valores); pacote.dados[CHAVE_ATIV] = JSON.stringify(ativas);
+  const blob = new Blob([JSON.stringify(pacote)], {type:"application/json"});
+  const hj = new Date();
+  await compartilhar(blob, `copia-calendario-${hj.getFullYear()}-${p2(hj.getMonth()+1)}-${p2(hj.getDate())}.json`);
+};
+document.getElementById("bkRestaurar").onclick = () => document.getElementById("bkArquivo").click();
+document.getElementById("bkArquivo").onchange = async (e) => {
+  const arq = e.target.files[0]; e.target.value = ""; if (!arq) return;
+  try {
+    const pacote = JSON.parse(await arq.text());
+    if (!pacote || pacote.app !== "calendario-etiquetas" || !pacote.dados) throw new Error();
+    const quando = pacote.criadoEm ? new Date(pacote.criadoEm).toLocaleString("pt-BR") : "data desconhecida";
+    document.getElementById("bkInfo").textContent = `Cópia feita em ${quando}. Os dados atuais deste aparelho serão substituídos por ela.`;
+    const fb = document.getElementById("fundoBk"); fb.classList.add("on");
+    document.getElementById("bkNao").onclick = () => fb.classList.remove("on");
+    document.getElementById("bkSim").onclick = () => {
+      Object.entries(pacote.dados).forEach(([c,v]) => { if (CHAVES_BK.includes(c)) { try { localStorage.setItem(c, v); } catch(e){} } });
+      fb.classList.remove("on"); location.reload();
+    };
+  } catch(err){ mostrarAviso("Esse arquivo não é uma cópia válida do calendário."); }
+};
+
+desenhar();
+pegarDownloads();
+// Funcionar sem internet (app instalado)
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); });
+}
+</script>
+</body>
+</html>
