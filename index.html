@@ -134,6 +134,11 @@
                      font:inherit;font-weight:700;font-size:.9rem;cursor:pointer;color:var(--ink)}
   .chk{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:.9rem;font-weight:600}
   .chk input{width:22px;height:22px;accent-color:var(--accent)}
+  .tipos{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .tipos button{padding:9px 4px;border-radius:9px;border:2px solid var(--line);background:#fff;font:inherit;
+                font-size:.78rem;font-weight:700;cursor:pointer;color:var(--ink)}
+  .tipos button.sel{border-color:var(--accent);background:#eef5f2}
+  #pixCopia{height:96px;font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-all}
   .quinz{display:flex;gap:8px}
   .quinz button{flex:1;padding:10px 8px;border-radius:10px;border:2px solid var(--line);background:#fff;font:inherit;
                 font-weight:700;font-size:.85rem;cursor:pointer;color:var(--ink);display:flex;flex-direction:column;gap:2px}
@@ -236,8 +241,17 @@
       <button data-q="2">Segunda quinzena<small id="q2txt"></small></button>
     </div>
     <div id="pixCampos">
-      <label for="pixChave">Chave Pix</label>
-      <input type="text" id="pixChave" maxlength="80" placeholder="CPF, celular, e-mail ou chave aleatória">
+      <label>Tipo de chave Pix</label>
+      <div class="tipos" id="pixTipos">
+        <button data-t="celular">Celular</button>
+        <button data-t="cpf">CPF</button>
+        <button data-t="email">E-mail</button>
+        <button data-t="aleatoria">Chave aleatória</button>
+        <button data-t="copiacola">Pix copia e cola</button>
+      </div>
+      <label for="pixChave" id="pixChaveRot">Chave Pix</label>
+      <input type="text" id="pixChave" maxlength="80">
+      <textarea id="pixCopia" maxlength="512" placeholder="Cole aqui o código do Pix copia e cola (começa com 000201...)" hidden></textarea>
       <label for="pixNome">Nome de quem vai receber</label>
       <input type="text" id="pixNome" maxlength="60" placeholder="Nome completo">
       <label for="pixBanco">Banco</label>
@@ -554,13 +568,21 @@ function gerarPDF(D, pix){
 
   // Pix
   if (pix){
-    y += 16; precisa(86);
-    B(M, y, W-2*M, 78);
+    const cc = pix.tipo === "copiacola";
+    const linhasCC = cc ? (pix.chave.match(/.{1,92}/g) || [""]) : [];
+    const alt = 94 + (cc ? 14 + linhasCC.length*11 : 0);
+    y += 16; precisa(alt + 8);
+    B(M, y, W-2*M, alt);
     T(M+12, y+18, "Pagamento via Pix", 11, true);
-    T(M+12, y+36, "Chave Pix: ", 10, true);  T(M+80, y+36, cortar(pix.chave,70), 10);
-    T(M+12, y+52, "Favorecido: ", 10, true); T(M+80, y+52, cortar(pix.nome,70), 10);
-    T(M+12, y+68, "Banco: ", 10, true);      T(M+80, y+68, cortar(pix.banco,70), 10);
-    y += 78;
+    T(M+12, y+36, "Favorecido: ", 10, true);    T(M+92, y+36, cortar(pix.nome,70), 10);
+    T(M+12, y+52, "Banco: ", 10, true);         T(M+92, y+52, cortar(pix.banco,70), 10);
+    T(M+12, y+68, "Tipo de chave: ", 10, true); T(M+92, y+68, pix.tipoNome || "", 10);
+    if (!cc){ T(M+12, y+84, "Chave Pix: ", 10, true); T(M+92, y+84, cortar(pix.chave,70), 10); }
+    else {
+      T(M+12, y+86, "Código Pix copia e cola:", 10, true);
+      linhasCC.forEach((l,i) => T(M+12, y+101+i*11, l, 8));
+    }
+    y += alt;
   }
   paginas.push(ops);
 
@@ -632,7 +654,9 @@ function gerarXLSX(D, pix){
   lin([["Dias da quinzena",1]]);
   lin([["Data",10],["Dia da semana",10],["Legenda",10],["Valor",10],["Descrição",10]]);
   D.dias.forEach(d => lin([d.data, d.sem, d.c?[d.leg,4+d.c]:"", [d.valor,2], d.desc]));
-  if (pix){ vazia(); lin([["Pagamento via Pix",1]]); lin([["Chave Pix",1], pix.chave]); lin([["Favorecido",1], pix.nome]); lin([["Banco",1], pix.banco]); }
+  if (pix){ vazia(); lin([["Pagamento via Pix",1]]); lin([["Favorecido",1], pix.nome]); lin([["Banco",1], pix.banco]);
+              lin([["Tipo de chave",1], pix.tipoNome || ""]);
+              lin([[pix.tipo === "copiacola" ? "Pix copia e cola" : "Chave Pix",1], pix.chave]); }
 
   vazia(); lin([CREDITO]);
   const larg = [22,16,22,16,44];
@@ -709,7 +733,63 @@ async function compartilhar(blob, nome){
 }
 
 const CHAVE_PIX = "calendario-pix-v1";
-let pixSalvo = {chave:"", nome:"", banco:""};
+let pixSalvo = {tipo:"", chave:"", nome:"", banco:""};
+const TIPOS_PIX = {
+  celular:   {nome:"Celular",          ph:"(18) 99999-9999", modo:"tel"},
+  cpf:       {nome:"CPF",              ph:"000.000.000-00",  modo:"numeric"},
+  email:     {nome:"E-mail",           ph:"nome@email.com",  modo:"email"},
+  aleatoria: {nome:"Chave aleatória",  ph:"Ex.: 1a2b3c4d-....-....-....-............", modo:"text"},
+  copiacola: {nome:"Pix copia e cola", ph:"", modo:"text"}
+};
+let tipoPix = "";
+const soNum = s => String(s).replace(/\D/g,"");
+function fmtCelular(s){
+  let d = soNum(s); if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
+  if (d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  return s;
+}
+function fmtCPF(s){ const d = soNum(s); return d.length === 11 ? `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}` : s; }
+function cpfValido(s){
+  const d = soNum(s); if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false;
+  for (let t=9; t<11; t++){
+    let soma = 0; for (let i=0;i<t;i++) soma += +d[i]*(t+1-i);
+    if (((soma*10)%11)%10 !== +d[t]) return false;
+  }
+  return true;
+}
+// Devolve a mensagem de erro, ou "" se estiver certo
+function conferirChave(tipo, v){
+  if (!tipo) return "Escolha o tipo de chave Pix.";
+  if (!v) return tipo === "copiacola" ? "Cole o código do Pix copia e cola." : "Preencha a chave Pix.";
+  if (tipo === "celular"){ let d = soNum(v); if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
+    return (d.length === 10 || d.length === 11) ? "" : "Celular inválido: use DDD + número, ex.: (18) 99999-9999."; }
+  if (tipo === "cpf") return cpfValido(v) ? "" : "CPF inválido. Confira os 11 números.";
+  if (tipo === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "" : "E-mail inválido.";
+  if (tipo === "aleatoria") return /^[0-9a-f]{32}$/i.test(v.replace(/-/g,"")) ? "" : "Chave aleatória inválida: ela tem 32 letras e números (com os tracinhos, 36).";
+  if (tipo === "copiacola") return (v.replace(/\s/g,"").length >= 50 && /^0002/.test(v.replace(/\s/g,""))) ? "" : "Código copia e cola inválido: ele começa com 000201 e é bem comprido.";
+  return "";
+}
+function aplicarTipo(t){
+  tipoPix = t;
+  document.querySelectorAll("#pixTipos button").forEach(b => b.classList.toggle("sel", b.dataset.t === t));
+  const inp = document.getElementById("pixChave"), txt = document.getElementById("pixCopia");
+  const cc = t === "copiacola";
+  inp.hidden = cc; txt.hidden = !cc;
+  document.getElementById("pixChaveRot").textContent = cc ? "Código Pix copia e cola" : (t ? `Chave Pix (${TIPOS_PIX[t].nome})` : "Chave Pix");
+  if (!cc){ inp.placeholder = t ? TIPOS_PIX[t].ph : "Escolha o tipo acima"; inp.inputMode = t ? TIPOS_PIX[t].modo : "text";
+            inp.type = t === "email" ? "email" : "text"; }
+  document.getElementById("expAviso").textContent = "";
+}
+document.getElementById("pixTipos").addEventListener("click", e => {
+  const b = e.target.closest("[data-t]"); if (!b) return;
+  const antes = tipoPix; aplicarTipo(b.dataset.t);
+  if (antes !== tipoPix){ document.getElementById("pixChave").value = ""; document.getElementById("pixCopia").value = ""; }
+});
+document.getElementById("pixChave").addEventListener("blur", e => {
+  if (tipoPix === "celular") e.target.value = fmtCelular(e.target.value);
+  if (tipoPix === "cpf") e.target.value = fmtCPF(e.target.value);
+});
 try { pixSalvo = Object.assign(pixSalvo, JSON.parse(localStorage.getItem(CHAVE_PIX)) || {}); } catch(e){}
 let tipoExp = "pdf", quinzSel = 1;
 const fundoExp = document.getElementById("fundoExp");
@@ -734,7 +814,15 @@ document.getElementById("resumo").addEventListener("click", e => {
            : (ano === hoje.getFullYear() && mes === hoje.getMonth()) ? 2 : 1;
   if (filtro) quinzSel = filtro;
   pintarQuinz();
-  document.getElementById("pixChave").value = pixSalvo.chave;
+  if (!pixSalvo.tipo && pixSalvo.chave){   // chave salva antes de existir o tipo: tenta adivinhar
+    const c = pixSalvo.chave, d = soNum(c);
+    pixSalvo.tipo = c.includes("@") ? "email" : /^0002/.test(c) ? "copiacola"
+      : /^[0-9a-f]{32}$/i.test(c.replace(/-/g,"")) ? "aleatoria" : cpfValido(c) ? "cpf"
+      : (d.length >= 10 && d.length <= 13) ? "celular" : "";
+  }
+  aplicarTipo(pixSalvo.tipo || "");
+  if (pixSalvo.tipo === "copiacola"){ document.getElementById("pixCopia").value = pixSalvo.chave; document.getElementById("pixChave").value = ""; }
+  else { document.getElementById("pixChave").value = pixSalvo.chave; document.getElementById("pixCopia").value = ""; }
   document.getElementById("pixNome").value = pixSalvo.nome;
   document.getElementById("pixBanco").value = pixSalvo.banco;
   document.getElementById("expAviso").textContent = "";
@@ -743,14 +831,22 @@ document.getElementById("resumo").addEventListener("click", e => {
 document.getElementById("eCancelar").onclick = () => fundoExp.classList.remove("on");
 fundoExp.addEventListener("click", e => { if (e.target === fundoExp) fundoExp.classList.remove("on"); });
 document.getElementById("eGerar").onclick = async () => {
-  const chave = document.getElementById("pixChave").value.trim();
+  const tipo = tipoPix;
+  let chave = tipo === "copiacola"
+    ? document.getElementById("pixCopia").value.replace(/[\r\n]+/g,"").trim()
+    : document.getElementById("pixChave").value.trim();
+  if (tipo === "celular") chave = fmtCelular(chave);
+  if (tipo === "cpf") chave = fmtCPF(chave);
+  if (tipo === "aleatoria" || tipo === "email") chave = chave.toLowerCase();
   const nome = document.getElementById("pixNome").value.trim();
   const banco = document.getElementById("pixBanco").value.trim();
-  const falta = [!chave && "chave Pix", !nome && "nome", !banco && "banco"].filter(Boolean);
+  const erroChave = conferirChave(tipo, chave);
+  if (erroChave){ document.getElementById("expAviso").textContent = erroChave; return; }
+  const falta = [!nome && "nome", !banco && "banco"].filter(Boolean);
   if (falta.length){ document.getElementById("expAviso").textContent = "Preencha: " + falta.join(", ") + "."; return; }
-  pixSalvo = {chave, nome, banco};
+  pixSalvo = {tipo, chave, nome, banco};
   try { localStorage.setItem(CHAVE_PIX, JSON.stringify(pixSalvo)); } catch(e){}
-  const D = dadosDaQuinzena(quinzSel), pix = {chave, nome, banco};
+  const D = dadosDaQuinzena(quinzSel), pix = {tipo, tipoNome: TIPOS_PIX[tipo].nome, chave, nome, banco};
   const base = `${quinzSel===1?"primeira":"segunda"}-quinzena-${MESES[mes]}-${ano}`
                  .normalize("NFD").replace(/[\u0300-\u036f]/g,"");
   fundoExp.classList.remove("on");
