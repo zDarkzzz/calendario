@@ -908,7 +908,15 @@ desenhar();
 pegarDownloads();
 // Funcionar sem internet (app instalado)
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); });
+  const jaTinha = !!navigator.serviceWorker.controller;
+  let recarregou = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (jaTinha && !recarregou){ recarregou = true; location.reload(); }   // versão nova chegou: mostra na hora
+  });
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js", {updateViaCache: "none"})
+      .then(reg => reg.update()).catch(() => {});
+  });
 }
 </script>
 </body>
